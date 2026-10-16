@@ -84,29 +84,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ubuntu-latest already has kubectl installed – no extra action needed.
-      # We create a minimal fake kubeconfig so kubectl --dry-run=client can
-      # resolve API group versions without connecting to a real cluster.
+      # ubuntu-latest ships with kubectl – no extra install action needed.
+      # Use kubectl config subcommands to build a minimal fake kubeconfig so
+      # --dry-run=client can resolve API groups without a real cluster.
+      # (A heredoc inside a YAML file embeds leading spaces and corrupts the
+      #  kubeconfig; kubectl config set-* writes a clean file instead.)
       - name: Set up minimal kubeconfig for client-side validation
         run: |
-          mkdir -p "$HOME/.kube"
-          cat > "$HOME/.kube/config" <<'EOF'
-          apiVersion: v1
-          kind: Config
-          clusters:
-          - cluster:
-              server: https://127.0.0.1:6443
-            name: fake
-          contexts:
-          - context:
-              cluster: fake
-              user: fake
-            name: fake
-          current-context: fake
-          users:
-          - name: fake
-            user: {}
-          EOF
+          kubectl config set-cluster fake --server=https://127.0.0.1:6443 --insecure-skip-tls-verify=true
+          kubectl config set-credentials fake --token=fake-token
+          kubectl config set-context fake --cluster=fake --user=fake
+          kubectl config use-context fake
           kubectl version --client
 
       - name: Validate manifests with kubectl dry-run

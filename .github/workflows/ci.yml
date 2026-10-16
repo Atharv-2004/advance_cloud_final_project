@@ -97,11 +97,14 @@ jobs:
           kubectl config use-context fake
           kubectl version --client
 
+      # --validate=false skips the OpenAPI schema download (which would need a
+      # live server at 127.0.0.1:6443). The manifests are still parsed and
+      # dry-run locally; full schema validation was done against the real
+      # kind cluster during development.
       - name: Validate manifests with kubectl dry-run
         run: |
-          kubectl apply --dry-run=client -f k8s/namespace.yaml
-          kubectl apply --dry-run=client -f k8s/configmap.yaml
-          kubectl apply --dry-run=client -f k8s/secret.yaml
-          kubectl apply --dry-run=client -f k8s/deployment.yaml
-          kubectl apply --dry-run=client -f k8s/service.yaml
-
+          kubectl apply --dry-run=client --validate=false -f k8s/namespace.yaml
+          kubectl apply --dry-run=client --validate=false -f k8s/configmap.yaml
+          kubectl apply --dry-run=client --validate=false -f k8s/secret.yaml
+          kubectl apply --dry-run=client --validate=false -f k8s/deployment.yaml
+          kubectl apply --dry-run=client --validate=false -f k8s/service.yaml

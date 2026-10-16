@@ -1,0 +1,42 @@
+# Docker Compose file for local Prometheus + Grafana monitoring stack
+# Usage: docker compose -f monitoring/docker-compose.monitoring.yml up -d
+#
+# Make sure the app is running locally first:
+#   npm start   (listens on port 3000)
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: ssd-prometheus
+    ports:
+      - "9090:9090"          # Prometheus UI: http://localhost:9090
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.2.2
+    container_name: ssd-grafana
+    ports:
+      - "3002:3000"          # Grafana UI: http://localhost:3002
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin   # Change this in production!
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./grafana-dashboard.json:/etc/grafana/provisioning/dashboards/ssd-dashboard.json:ro
+      - ./grafana-dashboard-provider.yml:/etc/grafana/provisioning/dashboards/provider.yml:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  prometheus_data:
+  grafana_data:

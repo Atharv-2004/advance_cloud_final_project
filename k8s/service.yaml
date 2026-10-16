@@ -1,0 +1,20 @@
+# Service – provides a stable network endpoint for our Pods
+# Pods come and go (they have random IPs), but the Service IP is stable
+# ClusterIP = internal-only, no external access (use port-forward or Ingress for that)
+apiVersion: v1
+kind: Service
+metadata:
+  name: ssd-service
+  namespace: ssd
+  labels:
+    app: service-status-dashboard
+spec:
+  type: ClusterIP
+  selector:
+    # This selector must match the Pod labels in the Deployment
+    app: service-status-dashboard
+  ports:
+    - name: http
+      port: 80          # Port exposed by the Service inside the cluster
+      targetPort: 3000  # Port the container is listening on
+      protocol: TCP

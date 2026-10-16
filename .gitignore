@@ -34,3 +34,7 @@ coverage/
 # Build output
 dist/
 build/
+
+# Private learning documents – local only, never pushed to GitHub
+docs/VIVA-GUIDE.md
+docs/DECISIONS.md

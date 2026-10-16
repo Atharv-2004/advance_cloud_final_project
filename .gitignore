@@ -20,9 +20,6 @@ desktop.ini
 *.swp
 *.swo
 
-# Docker
-.dockerignore
-
 # Logs
 logs/
 *.log

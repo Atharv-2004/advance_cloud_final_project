@@ -1,0 +1,42 @@
+# Files to EXCLUDE from the Docker build context
+# Keeping the context small speeds up builds and prevents leaking secrets
+
+# Version control
+.git/
+.gitignore
+
+# Node.js
+node_modules/
+npm-debug.log*
+
+# Test files (not needed in the production image)
+test/
+coverage/
+.nyc_output/
+
+# Development scripts
+scripts/
+
+# Documentation
+docs/
+README.md
+*.md
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files – NEVER bake secrets into an image
+.env
+.env.*
+
+# CI/CD
+.github/
+
+# Kubernetes manifests (not needed inside the image)
+k8s/

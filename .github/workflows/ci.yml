@@ -84,12 +84,36 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install kubectl
-        uses: azure/setup-kubectl@v4
+      # ubuntu-latest already has kubectl installed – no extra action needed.
+      # We create a minimal fake kubeconfig so kubectl --dry-run=client can
+      # resolve API group versions without connecting to a real cluster.
+      - name: Set up minimal kubeconfig for client-side validation
+        run: |
+          mkdir -p "$HOME/.kube"
+          cat > "$HOME/.kube/config" <<'EOF'
+          apiVersion: v1
+          kind: Config
+          clusters:
+          - cluster:
+              server: https://127.0.0.1:6443
+            name: fake
+          contexts:
+          - context:
+              cluster: fake
+              user: fake
+            name: fake
+          current-context: fake
+          users:
+          - name: fake
+            user: {}
+          EOF
+          kubectl version --client
 
       - name: Validate manifests with kubectl dry-run
         run: |
           kubectl apply --dry-run=client -f k8s/namespace.yaml
           kubectl apply --dry-run=client -f k8s/configmap.yaml
+          kubectl apply --dry-run=client -f k8s/secret.yaml
           kubectl apply --dry-run=client -f k8s/deployment.yaml
           kubectl apply --dry-run=client -f k8s/service.yaml
+

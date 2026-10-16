@@ -84,27 +84,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ubuntu-latest ships with kubectl – no extra install action needed.
-      # Use kubectl config subcommands to build a minimal fake kubeconfig so
-      # --dry-run=client can resolve API groups without a real cluster.
-      # (A heredoc inside a YAML file embeds leading spaces and corrupts the
-      #  kubeconfig; kubectl config set-* writes a clean file instead.)
-      - name: Set up minimal kubeconfig for client-side validation
+      # kubeconform validates Kubernetes YAML against the official JSON schemas
+      # completely offline – no cluster or kubeconfig needed.
+      # kubectl apply --dry-run=client always contacts the server to resolve API
+      # groups even with --validate=false, so it cannot work in a clusterless CI.
+      - name: Install kubeconform
         run: |
-          kubectl config set-cluster fake --server=https://127.0.0.1:6443 --insecure-skip-tls-verify=true
-          kubectl config set-credentials fake --token=fake-token
-          kubectl config set-context fake --cluster=fake --user=fake
-          kubectl config use-context fake
-          kubectl version --client
+          VERSION="v0.6.7"
+          curl -sSLo /tmp/kubeconform.tar.gz \
+            "https://github.com/yannh/kubeconform/releases/download/${VERSION}/kubeconform-linux-amd64.tar.gz"
+          tar -xf /tmp/kubeconform.tar.gz -C /tmp
+          chmod +x /tmp/kubeconform
+          /tmp/kubeconform -v
 
-      # --validate=false skips the OpenAPI schema download (which would need a
-      # live server at 127.0.0.1:6443). The manifests are still parsed and
-      # dry-run locally; full schema validation was done against the real
-      # kind cluster during development.
-      - name: Validate manifests with kubectl dry-run
+      - name: Validate Kubernetes manifests
         run: |
-          kubectl apply --dry-run=client --validate=false -f k8s/namespace.yaml
-          kubectl apply --dry-run=client --validate=false -f k8s/configmap.yaml
-          kubectl apply --dry-run=client --validate=false -f k8s/secret.yaml
-          kubectl apply --dry-run=client --validate=false -f k8s/deployment.yaml
-          kubectl apply --dry-run=client --validate=false -f k8s/service.yaml
+          /tmp/kubeconform -strict -summary \
+            k8s/namespace.yaml \
+            k8s/configmap.yaml \
+            k8s/secret.yaml \
+            k8s/deployment.yaml \
+            k8s/service.yaml

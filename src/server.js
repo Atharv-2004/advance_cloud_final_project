@@ -224,18 +224,9 @@ function handleRequest(req, res) {
 }
 
 // ---------------------------------------------------------------------------
-// Create and start the HTTP server
+// Create the HTTP server (do NOT call listen here – see note below)
 // ---------------------------------------------------------------------------
 const server = http.createServer(handleRequest);
-
-server.listen(CONFIG.PORT, CONFIG.HOST, () => {
-  console.log(`✅ ${CONFIG.SERVICE_NAME} v${CONFIG.SERVICE_VERSION} started`);
-  console.log(`   Listening on http://${CONFIG.HOST}:${CONFIG.PORT}`);
-  console.log(`   Environment : ${CONFIG.ENV}`);
-  console.log(`   Dashboard   : http://localhost:${CONFIG.PORT}/`);
-  console.log(`   Health      : http://localhost:${CONFIG.PORT}/health`);
-  console.log(`   Metrics     : http://localhost:${CONFIG.PORT}/metrics`);
-});
 
 // ---------------------------------------------------------------------------
 // Graceful shutdown – important for Kubernetes pod termination
@@ -254,8 +245,24 @@ function shutdown(signal) {
   }, 10_000);
 }
 
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT',  () => shutdown('SIGINT'));
+// ---------------------------------------------------------------------------
+// Auto-start only when this file is run directly (node src/server.js).
+// When required() by tests, the test's before() hook starts the server
+// on a dedicated test port instead, avoiding ERR_SERVER_ALREADY_LISTEN.
+// ---------------------------------------------------------------------------
+if (require.main === module) {
+  server.listen(CONFIG.PORT, CONFIG.HOST, () => {
+    console.log(`✅ ${CONFIG.SERVICE_NAME} v${CONFIG.SERVICE_VERSION} started`);
+    console.log(`   Listening on http://${CONFIG.HOST}:${CONFIG.PORT}`);
+    console.log(`   Environment : ${CONFIG.ENV}`);
+    console.log(`   Dashboard   : http://localhost:${CONFIG.PORT}/`);
+    console.log(`   Health      : http://localhost:${CONFIG.PORT}/health`);
+    console.log(`   Metrics     : http://localhost:${CONFIG.PORT}/metrics`);
+  });
 
-// Export server for use in tests
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT',  () => shutdown('SIGINT'));
+}
+
+// Export server and helpers for use in tests
 module.exports = { server, CONFIG, metrics };

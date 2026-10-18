@@ -1,0 +1,40 @@
+# Alert Rules for Service Status Dashboard
+# These rules tell Prometheus when to fire an alert
+
+groups:
+  - name: ssd_alerts
+    rules:
+      # Alert: Service is down (no data for 1 minute)
+      - alert: ServiceDown
+        expr: up{job="service-status-dashboard"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service Status Dashboard is DOWN"
+          description: "The service has been unreachable for more than 1 minute."
+
+      # Alert: High error rate (more than 10% of requests are errors)
+      - alert: HighErrorRate
+        expr: >
+          (
+            rate(http_errors_total[5m])
+            /
+            rate(http_requests_total[5m])
+          ) > 0.10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP error rate detected"
+          description: "More than 10% of requests are returning errors over the last 5 minutes."
+
+      # Alert: High average latency (average response time > 500ms)
+      - alert: HighLatency
+        expr: http_request_duration_ms_avg > 500
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High request latency"
+          description: "Average request latency is above 500ms for more than 2 minutes."

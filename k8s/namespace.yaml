@@ -1,0 +1,8 @@
+# Namespace – a logical boundary that groups our resources
+# Think of it like a folder inside Kubernetes
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ssd
+  labels:
+    app: service-status-dashboard

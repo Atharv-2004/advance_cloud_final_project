@@ -1,0 +1,107 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CI Workflow – runs on every push and pull request
+# Purpose: verify tests, lint, Docker build, and Kubernetes manifests pass
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: CI
+
+on:
+  push:
+    branches: ["master", "devops-demo"]
+  pull_request:
+    branches: ["master"]
+
+# Minimal permissions – principle of least privilege
+permissions:
+  contents: read
+
+jobs:
+  # ── 1. Run automated tests ──────────────────────────────────────────────────
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+  # ── 2. Lint ─────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Run lint
+        run: npm run lint
+
+  # ── 3. Docker image build validation ────────────────────────────────────────
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: service-status-dashboard:ci-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── 4. Kubernetes manifest validation ───────────────────────────────────────
+  k8s-validate:
+    name: Kubernetes Manifest Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # kubeconform validates Kubernetes YAML against the official JSON schemas
+      # completely offline – no cluster or kubeconfig needed.
+      # kubectl apply --dry-run=client always contacts the server to resolve API
+      # groups even with --validate=false, so it cannot work in a clusterless CI.
+      - name: Install kubeconform
+        run: |
+          VERSION="v0.6.7"
+          curl -sSLo /tmp/kubeconform.tar.gz \
+            "https://github.com/yannh/kubeconform/releases/download/${VERSION}/kubeconform-linux-amd64.tar.gz"
+          tar -xf /tmp/kubeconform.tar.gz -C /tmp
+          chmod +x /tmp/kubeconform
+          /tmp/kubeconform -v
+
+      - name: Validate Kubernetes manifests
+        run: |
+          /tmp/kubeconform -strict -summary \
+            k8s/namespace.yaml \
+            k8s/configmap.yaml \
+            k8s/secret.yaml \
+            k8s/deployment.yaml \
+            k8s/service.yaml

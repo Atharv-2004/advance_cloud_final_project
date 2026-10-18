@@ -1,0 +1,98 @@
+# Deployment – manages a set of identical Pod replicas
+# Kubernetes ensures the desired number of Pods is always running
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ssd-deployment
+  namespace: ssd
+  labels:
+    app: service-status-dashboard
+spec:
+  # Rolling update strategy: replace one Pod at a time
+  # maxSurge=1 means one extra Pod can exist during update
+  # maxUnavailable=0 means no downtime (zero-downtime deploys)
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+
+  # The selector tells Kubernetes which Pods belong to this Deployment
+  selector:
+    matchLabels:
+      app: service-status-dashboard
+
+  template:
+    metadata:
+      labels:
+        app: service-status-dashboard
+    spec:
+      # Security context for the entire Pod
+      securityContext:
+        runAsNonRoot: true          # Enforce non-root at Pod level
+        runAsUser: 1001             # UID for appuser (created in Dockerfile)
+        fsGroup: 1001
+
+      containers:
+        - name: ssd
+          # Use the locally loaded image (for kind)
+          # In production this would be: ghcr.io/atharv-2004/service-status-dashboard:sha-<hash>
+          image: service-status-dashboard:latest
+          imagePullPolicy: Never    # Use local image loaded via kind load
+
+          ports:
+            - containerPort: 3000
+              name: http
+
+          # Load non-secret config from ConfigMap
+          envFrom:
+            - configMapRef:
+                name: ssd-config
+
+          # Load secret values from Secret
+          env:
+            - name: APP_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ssd-secret
+                  key: APP_SECRET_KEY
+
+          # Resource requests and limits
+          # requests = what Kubernetes schedules for
+          # limits = hard ceiling the container cannot exceed
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"       # 50 millicores = 0.05 CPU
+            limits:
+              memory: "128Mi"
+              cpu: "200m"      # 200 millicores = 0.2 CPU
+
+          # Liveness probe: if this fails, Kubernetes restarts the Pod
+          # Used to detect a frozen/crashed application
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            failureThreshold: 3
+
+          # Readiness probe: if this fails, the Pod is removed from the Service
+          # Prevents traffic reaching a Pod that isn't ready yet
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+
+          # Security context for the container
+          securityContext:
+            allowPrivilegeEscalation: false   # Cannot gain more permissions
+            readOnlyRootFilesystem: false      # App needs to write to stdout
+            capabilities:
+              drop:
+                - ALL                          # Drop all Linux capabilities
